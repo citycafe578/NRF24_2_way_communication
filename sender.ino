@@ -6,8 +6,7 @@
 RF24 radio(17, 5);
 const byte address[][6] = {"00001", "00002"};
 int data[4] = {};
-bool mode = 1; // 0 == TX, 1 == RX
-int send_data = 00000;
+bool mode = 0; // 0 == TX, 1 == RX
 
 void clock(void *pvParam){
   vTaskDelay(200 / portTICK_PERIOD_MS);
@@ -58,10 +57,8 @@ void setup() {
 
 void loop(){
   if(mode == 0){
-    radio.stopListening();
-    radio.write(&data, sizeof(send_data));
+
   }else{
-    radio.startListening();
     if (radio.available()){
       char receivedData[64] = {0};
       radio.read(&receivedData, sizeof(receivedData));
