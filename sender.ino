@@ -9,7 +9,8 @@ int data[4] = {};
 bool mode = 0; // 0 == TX, 1 == RX
 bool connected = false;
 int lost_connected = 0;
-int send_data = 12321;
+int send_data = 1232;
+int request_data = 0001;
 
 void clock(void *pvParam){
   vTaskDelay(200 / portTICK_PERIOD_MS);
@@ -27,15 +28,7 @@ void nrf_receive_Task(void *pvParam){
     }
     radio.startListening();
     if (radio.available()){
-      char receivedData[64] = {0};
-      radio.read(&receivedData, sizeof(receivedData));
-      char *token = strtok(receivedData, " ");
-      int index = 0;
-      while (token != NULL && index < 4) {
-        data[index] = atoi(token);
-        index++;
-        token = strtok(NULL, " ");
-      }
+      read_data();
     }
     for(int i = 0; i < 4; i++){
       Serial.print(data[i]);
@@ -60,7 +53,17 @@ void setup() {
 
 void loop(){
   if(connected == false){
-
+    if(mode == 0){
+      radio.stopListening();
+      radio.write(&data, sizeof(request_data));
+    }else{
+      radio.startListening();
+      if(radio.available()){
+        read_data();
+      }else{
+        lost_connected++;
+      }
+    } 
   }else{
     if(lost_connected >= 3){
       connected = false;
@@ -70,23 +73,23 @@ void loop(){
       radio.write(&data, sizeof(send_data));
     }else{
       radio.startListening();
-      if(radio.available()){
-        char receivedData[64] = {0};
-        radio.read(&receivedData, sizeof(receivedData));
-        char *token = strtok(receivedData, " ");
-        int index = 0;
-        while (token != NULL && index < 4) {
-          data[index] = atoi(token);
-          index++;
-          token = strtok(NULL, " ");
-        }
-      }else{
-        lost_connected++;
-      }
+      read_data();
       for(int i = 0; i < 4; i++){
         Serial.print(data[i]);
       }
       Serial.println();
     }
+  }
+}
+
+void read_data(){
+  char receivedData[64] = {0};
+  radio.read(&receivedData, sizeof(receivedData));
+  char *token = strtok(receivedData, " ");
+  int index = 0;
+  while (token != NULL && index < 4) {
+    data[index] = atoi(token);
+    index++;
+    token = strtok(NULL, " ");
   }
 }
