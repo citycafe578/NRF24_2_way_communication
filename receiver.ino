@@ -5,48 +5,61 @@
 
 RF24 radio(4, 5);
 const byte address[6] = "00001";
-int modes = 0;
-// TaskHandle_t clockModeHandle = NULL;
+volatile int mode = 1;
 
-void clock_mode(void *pvParam) {
+void clock_mode(void *pvParam){
   for (;;) {
-    vTaskDelay(200 / portTICK_PERIOD_MS);
-    modes = (modes + 1) % 2;
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    mode = (mode + 1) % 2;
+
+    if(mode == 0){
+        radio.startListening();
+    }else{
+      radio.stopListening();
+    }
+
+    Serial.print("ESP32 Mode changed to: ");
+    Serial.println(mode);
   }
 }
 
-void setup() {
+void setup(){
   Serial.begin(115200);
-  if (!radio.begin()) {
-    Serial.println("Radio hardware is not responding!");
+  delay(2000);
+  Serial.println("ESP32 Initialized!");
+
+  if (!radio.begin()){
+    Serial.println("ESP32: Radio hardware is not responding!");
     while (1);
   }
 
-  radio.openReadingPipe(1, address);
   radio.setPALevel(RF24_PA_HIGH);
   radio.setChannel(100);
-  radio.startListening();
-  
-  xTaskCreatePinnedToCore(clock_mode, "clock_mode", 2048, NULL, 1, NULL, 1);
+  radio.openWritingPipe(address);
+  radio.openReadingPipe(1, address);
+  radio.stopListening();
+  xTaskCreatePinnedToCore(clock_mode, "clock_mode", 1024, NULL, 1, NULL, 1);
 }
 
-void loop() {
-  if(modes == 0){
-    radio.stopListening();
-    delay(10);
-    const char text[] = "Hello, drone";
-    radio.write(&text, sizeof(text));
-    Serial.println("message sent!");
-  }else{
-    radio.startListening();
-    delay(10);
-    char text[32] = "";
+void loop(){
+  const char text[] = "Hello, ground";
+    
+  if(mode == 0){
     if(radio.available()){
-      radio.read(&text, sizeof(text));
-      Serial.print("Received: ");
-      Serial.println(text);
+      char receivedData[32] = {0};
+      radio.read(&receivedData, sizeof(receivedData));
+      Serial.print("ESP32 Received: ");
+      Serial.println(receivedData);
     }else{
-      Serial.println("can't receive the message");
+      Serial.println("ESP32: No data");
+      }
+  }else{
+    bool success = radio.write(&text, strlen(text) + 1);
+    if (success){
+      Serial.println("ESP32: Send successful");
+    }else{
+      Serial.println("ESP32: Send failed");
     }
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
